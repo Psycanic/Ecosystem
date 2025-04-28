@@ -160,7 +160,7 @@ public class Follower : MonoBehaviour
             return;
         }
 
-        // 检查Sign是否正在消失
+        //check sign isDisappeaering state
         Sign sign = currentSign.GetComponent<Sign>();
         if (sign != null && sign.isDisappearing)
         {
@@ -170,7 +170,7 @@ public class Follower : MonoBehaviour
             return;
         }
 
-        // 检查是否看到The Still One
+        // check if stillone is in sight
         if (theStillOne != null && Vector3.Distance(transform.position, theStillOne.position) <= detectionRange)
         {
             if (Random.value < danceEscapeChance)
@@ -181,10 +181,10 @@ public class Follower : MonoBehaviour
             }
         }
 
-        // 更新舞蹈半径
+        // shrink the radius of dancing
         currentDanceRadius = Mathf.Max(minDanceRadius, currentDanceRadius - danceRadiusDecreaseRate * Time.deltaTime);
         
-        // 计算舞蹈位置（围绕Sign做圆周运动）
+        
         danceAngle += danceSpeed * Time.deltaTime;
         Vector3 targetPosition = currentSign.position + new Vector3(
             Mathf.Cos(danceAngle) * currentDanceRadius,
@@ -192,18 +192,16 @@ public class Follower : MonoBehaviour
             0f
         );
         
-        // 应用Pivot偏移量
         targetPosition += new Vector3(pivotOffset.x, pivotOffset.y, 0f);
-        
-        // 移动到目标位置
+    
         Vector3 direction = (targetPosition - transform.position).normalized;
         transform.position += direction * moveSpeed * Time.deltaTime;
         
-        // 更新朝向
+        // new direction
         float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
         transform.rotation = Quaternion.Lerp(transform.rotation, Quaternion.Euler(0, 0, angle), rotationSpeed * Time.deltaTime);
         
-        // 检查是否碰到sign
+        // check sign collision
         if (Vector3.Distance(transform.position, currentSign.position) < 0.5f)
         {
             HandleSignCollision();
@@ -218,10 +216,9 @@ public class Follower : MonoBehaviour
             return;
         }
 
-        // 计算远离The Still One的方向
+        // calculate opposite directino from stillOne
         Vector3 fleeDirection = PhysicsHelper.GetFleeDirection(transform.position, theStillOne.position);
         
-        // 应用力
         if (rb != null)
         {
             PhysicsHelper.ApplyForce(rb, fleeDirection, fleeSpeed);
@@ -231,7 +228,6 @@ public class Follower : MonoBehaviour
             transform.position += fleeDirection * fleeSpeed * Time.deltaTime;
         }
         
-        // 检查是否已经逃离足够远
         if (PhysicsHelper.IsInRange(transform, theStillOne, detectionRange * 1.5f))
         {
             currentState = FollowerState.Idle;
@@ -241,20 +237,20 @@ public class Follower : MonoBehaviour
 
     void CheckEnvironment()
     {
-        // 如果在冷却中，只允许Idle和Moving状态
+        
         if (isInCooldown)
         {
             return;
         }
 
-        // 检查是否有The Still One在范围内
+        // check stillOne in sight
         if (theStillOne != null && PhysicsHelper.IsInRange(transform, theStillOne, detectionRange))
         {
             currentState = FollowerState.Fleeing;
             return;
         }
 
-        // 检查是否有Signs在范围内
+        // check Sign in Sight
         const string SIGN_TAG = "Sign";
         Collider2D[] signs = PhysicsHelper.GetObjectsInRange(transform.position, detectionRange, SIGN_TAG);
         
@@ -267,7 +263,7 @@ public class Follower : MonoBehaviour
         {
             if (signCollider == null) continue;
 
-            // 检查这个Sign是否已经有Follower在跳舞
+            // CHeck follower in sight if they are dancing
             Follower[] nearbyFollowers = PhysicsHelper.GetComponentsInRange<Follower>(signCollider.transform.position, detectionRange);
             bool hasDancingFollower = false;
             
@@ -280,7 +276,7 @@ public class Follower : MonoBehaviour
                 }
             }
 
-            // 如果已经有Follower在跳舞，加入他们
+            /
             if (hasDancingFollower)
             {
                 currentSign = signCollider.transform;
@@ -289,7 +285,7 @@ public class Follower : MonoBehaviour
                 isDancing = true;
                 return;
             }
-            // 如果是新的Sign，开始新的舞蹈
+            // if the sisgn has no follower dancing around, start new cycle
             else if (!isDancing)
             {
                 currentSign = signCollider.transform;
@@ -303,14 +299,14 @@ public class Follower : MonoBehaviour
 
     void HandleSignCollision()
     {
-        // 生成新的Followers
+        // new follower spawn
         int spawnCount = Random.Range(minSpawnCount, maxSpawnCount);
         for (int i = 0; i < spawnCount; i++)
         {
             SpawnNewFollower();
         }
         
-        // 销毁当前Follower
+        //destroy
         if (creatureManager != null)
         {
             creatureManager.OnFollowerDestroyed(gameObject);
@@ -323,7 +319,6 @@ public class Follower : MonoBehaviour
         Vector3 spawnPos = transform.position + Random.insideUnitSphere * 2f;
         spawnPos.z = 0f;
         GameObject newFollower = Instantiate(gameObject, spawnPos, Quaternion.identity);
-        // 新生成的Follower会继承相同的冷却时间设置
     }
 
     void SetNewRandomPoint()
@@ -346,24 +341,22 @@ public class Follower : MonoBehaviour
 
     void OnCollisionEnter2D(Collision2D collision)
     {
-        // 处理与The Still One的碰撞
+        //StillOne collision
         if (collision.gameObject.CompareTag("TheStillOne"))
         {
-            // 通知CreatureManager
             if (creatureManager != null)
             {
                 creatureManager.OnFollowerDestroyed(gameObject);
             }
-            // 销毁当前Follower
             Destroy(gameObject);
             return;
         }
 
-        // 处理与其他Follower的碰撞
+        // Collision with Followers
         Follower otherFollower = collision.gameObject.GetComponent<Follower>();
         if (otherFollower != null)
         {
-            // 计算碰撞方向并应用力
+            
             Vector3 collisionDirection = PhysicsHelper.GetMoveDirection(transform.position, collision.transform.position);
             if (rb != null)
             {
@@ -377,7 +370,7 @@ public class Follower : MonoBehaviour
         transform.position = PhysicsHelper.ClampToScreenBounds(transform.position, mainCamera, screenBoundaryOffset);
     }
 
-    // 添加新方法
+    //check disappearing state
     public void OnSignDisappearing()
     {
         if (currentState == FollowerState.Dancing)
