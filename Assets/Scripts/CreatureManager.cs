@@ -3,19 +3,19 @@ using System.Collections.Generic;
 
 public class CreatureManager : MonoBehaviour
 {
-    [Header("Follower设置")]
+   //follower
     public GameObject followerPrefab;
     public int initialFollowerCount = 10;
     public float followerSpawnInterval = 2f;
     public int maxFollowerCount = 50;
     
-    [Header("Sign设置")]
+    //sign
     public GameObject signPrefab;
     public int initialSignCount = 3;
     public float signSpawnInterval = 5f;
     public int maxSignCount = 8;
     
-    [Header("生成范围设置")]
+    //spawnrange
     public float spawnRadius = 2f;
     public float minSpawnDistance = 3f;
     
