@@ -276,7 +276,7 @@ public class Follower : MonoBehaviour
                 }
             }
 
-            /
+            
             if (hasDancingFollower)
             {
                 currentSign = signCollider.transform;

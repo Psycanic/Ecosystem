@@ -389,7 +389,6 @@ MonoBehaviour:
   danceRadiusDecreaseRate: 0.1
   joinDanceChance: 0.3
   danceEscapeChance: 0.1
-  danceAnimationSpeed: 2
   danceAmplitude: 0.5
   minSpawnCount: 1
   maxSpawnCount: 3
@@ -640,8 +639,8 @@ MonoBehaviour:
   followers: []
   screenBoundaryOffset: 1
   spawnOffset: 2
-  deathDuration: 20
   collisionThreshold: 10
+  deathDuration: 20
   shrinkSpeed: 0.05
   fadeSpeed: 0.05
 --- !u!58 &1012629113
@@ -827,8 +826,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1730215146}
   - component: {fileID: 1730215145}
-  - component: {fileID: 1730215144}
   - component: {fileID: 1730215147}
+  - component: {fileID: 1730215148}
   m_Layer: 0
   m_Name: Sign
   m_TagString: Sign
@@ -836,18 +835,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1730215144
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1730215143}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 93165916efca4fc419bb3cc455013ab9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!212 &1730215145
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -1007,6 +994,22 @@ PolygonCollider2D:
       - {x: -0.074999996, y: -0.75}
       - {x: 0.015, y: -0.76}
   m_UseDelaunayMesh: 0
+--- !u!114 &1730215148
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1730215143}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a97a4960cf0480842a7f9fd983c29b79, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationSpeed: 180
+  shrinkSpeed: 1
+  fadeSpeed: 1
+  isDisappearing: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
