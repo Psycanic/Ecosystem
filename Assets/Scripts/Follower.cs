@@ -108,10 +108,12 @@ public class Follower : MonoBehaviour
         }
 
         if (!stillOneInRange)
-     = false;
-        else if (currentState != FollowerState.Fleeing &&)
         {
-     = true;
+            isRolledThisOverlap = false;
+        }
+        else if (currentState != FollowerState.Fleeing && !isRolledThisOverlap)
+        {
+            isRolledThisOverlap = true;
             if (Random.value < stillOneFleeChance)
                 EnterFleeing();
         }
