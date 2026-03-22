@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 public class Follower : MonoBehaviour
 {
-    public enum FollowerState
+    private enum FollowerState
     {
         Idle,
         Moving,
@@ -11,57 +11,61 @@ public class Follower : MonoBehaviour
         Fleeing
     }
 
-   
-    public float moveSpeed = 8f;
-    public float idleSpeed = 2f;
-    public float rotationSpeed = 5f;
-    public float detectionRange = 10f;
-    public float danceSpeed = 3f;
-    public float fleeSpeed = 12f;
-    public float spawnCooldown = 7f; // 生成后的冷却时间
-    public Vector2 pivotOffset = Vector2.zero; // 添加Pivot偏移量设置
+    private float moveSpeed = 3f;
+    private float idleSpeed = 2f;
+    private float rotationSpeed = 5f;
+    private float detectionRange = 7f;
+    private float danceSpeed = 4f;
+    private float fleeSpeed = 5f;
+    private float spawnCooldown = 7f; 
+    private Vector2 pivotOffset = Vector2.zero; 
     
-    public float minMoveTime = 0.5f;
-    public float maxMoveTime = 2f;
-    public float minIdleTime = 0.3f;
-    public float maxIdleTime = 1.5f;
+    private float minMoveTime = 0.5f;
+    private float maxMoveTime = 2f;
+    private float minIdleTime = 0.3f;
+    private float maxIdleTime = 1.5f;
     
 
     //dance as a circle 
-    public float initialDanceRadius = 5f;
+    private float initialDanceRadius = 5f;
     //slowly decrease in radius
-    public float minDanceRadius = 1f;
-    public float danceRadiusDecreaseRate = 0.1f;
-    //chances to join others' dancing action
-    public float joinDanceChance = 0.3f;
-    public float danceEscapeChance = 0.1f; // chance to flee when see StillOne
-    public float danceAmplitude = 0.5f; // dance amount
-    
-   //spawn setting
+    private float minDanceRadius = 1f;
+    private float danceRadiusDecreaseRate = 0.1f;
+    [SerializeField, Range(0f, 1f)] private float stillOneFleeChance = 0.1f; // 每次进入 StillOne 检测范围时触发逃跑的概率
+    //spawn setting
     public int minSpawnCount = 1;
     public int maxSpawnCount = 3;
-    
-    
-    public float collisionForce = 5f;
        
     private FollowerState currentState = FollowerState.Idle;
     private Vector3 targetPoint;
+
+    //dance setting
     private float stateTimer = 0f;
     private float currentDanceRadius;
     private float danceAngle = 0f;
-    private float personalDanceAngle = 0f; // 个人舞蹈角度
+
+    //still one setting
     public Transform currentSign;
     private Transform theStillOne;
-    private List<Transform> otherFollowers = new List<Transform>();
+
+
     private Camera mainCamera;
     private float minX, maxX, minY, maxY;
     private float screenBoundaryOffset = 1f;
     private CreatureManager creatureManager;
     private bool isDancing = false;
     private Rigidbody2D rb;
-    private Collider2D followerCollider;
-    private float spawnTimer = 0f; // 生成后的计时器
-    private bool isInCooldown = true; // 是否在冷却中
+
+    //spawn setting
+    private float spawnTimer = 0f; 
+    private bool isInCooldown = true; 
+    //state setting
+    private float currentStateDuration = 0f;
+    private float fleeStartDistance = 0f;
+    //sign setting
+    private readonly HashSet<Transform> nearbySigns = new HashSet<Transform>();
+    private bool stillOneInRange = false;
+    private bool isRolledThisOverlap = false; // avoid rolling every frame
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -71,14 +75,13 @@ public class Follower : MonoBehaviour
         SetNewRandomPoint();
         FindTheStillOne();
         creatureManager = FindObjectOfType<CreatureManager>();
-        
-        // 获取组件
+    
         rb = GetComponent<Rigidbody2D>();
-        followerCollider = GetComponent<Collider2D>();
         
-        // 初始化冷却状态
+       
         spawnTimer = 0f;
         isInCooldown = true;
+        EnterIdle();
     }
 
     void FindTheStillOne()
@@ -94,13 +97,31 @@ public class Follower : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        // 更新冷却计时器
+        
         if (isInCooldown)
         {
             spawnTimer += Time.deltaTime;
             if (spawnTimer >= spawnCooldown)
             {
                 isInCooldown = false;
+            }
+        }
+
+        if (!stillOneInRange)
+     = false;
+        else if (currentState != FollowerState.Fleeing &&)
+        {
+     = true;
+            if (Random.value < stillOneFleeChance)
+                EnterFleeing();
+        }
+
+        if ((currentState == FollowerState.Idle || currentState == FollowerState.Moving) && !isInCooldown && nearbySigns.Count > 0)
+        {
+            Transform signTarget = SelectNearestSign();
+            if (signTarget != null)
+            {
+                EnterDancing(signTarget);
             }
         }
 
@@ -120,34 +141,27 @@ public class Follower : MonoBehaviour
                 break;
         }
 
-        ClampPosition();
+        WrapScreenPosition();
     }
 
     void HandleIdle()
     {
         stateTimer += Time.deltaTime;
-        
-        // 在静止状态下检查周围环境
-        if (stateTimer >= Random.Range(minIdleTime, maxIdleTime))
+
+        if (stateTimer >= currentStateDuration)
         {
-            CheckEnvironment();
-            if (currentState == FollowerState.Idle) // 如果没有进入其他状态
-            {
-                SetNewRandomPoint();
-                currentState = FollowerState.Moving;
-                stateTimer = 0f;
-            }
+            EnterMoving();
         }
     }
 
     void HandleMoving()
     {
         MoveTowards(targetPoint);
-        
-        if (Vector3.Distance(transform.position, targetPoint) < 0.1f)
+
+        stateTimer += Time.deltaTime;
+        if (stateTimer >= currentStateDuration || Vector3.Distance(transform.position, targetPoint) < 0.1f)
         {
-            currentState = FollowerState.Idle;
-            stateTimer = 0f;
+            EnterIdle();
         }
     }
 
@@ -155,56 +169,45 @@ public class Follower : MonoBehaviour
     {
         if (currentSign == null)
         {
-            currentState = FollowerState.Idle;
-            isDancing = false;
+            ExitDancing();
+            EnterIdle();
             return;
         }
 
-        //check sign isDisappeaering state
         Sign sign = currentSign.GetComponent<Sign>();
         if (sign != null && sign.isDisappearing)
         {
-            currentState = FollowerState.Idle;
-            isDancing = false;
-            currentSign = null;
+            ExitDancing();
+            EnterIdle();
             return;
         }
 
-        // check if stillone is in sight
-        if (theStillOne != null && Vector3.Distance(transform.position, theStillOne.position) <= detectionRange)
-        {
-            if (Random.value < danceEscapeChance)
-            {
-                currentState = FollowerState.Fleeing;
-                isDancing = false;
-                return;
-            }
-        }
+        UpdateDanceSpinning();
+    }
 
-        // shrink the radius of dancing
+    void UpdateDanceSpinning()
+    {
         currentDanceRadius = Mathf.Max(minDanceRadius, currentDanceRadius - danceRadiusDecreaseRate * Time.deltaTime);
-        
-        
         danceAngle += danceSpeed * Time.deltaTime;
-        Vector3 targetPosition = currentSign.position + new Vector3(
+
+        Vector3 center = currentSign.position + new Vector3(pivotOffset.x, pivotOffset.y, 0f);
+
+        Vector3 targetPosition = center + new Vector3(
             Mathf.Cos(danceAngle) * currentDanceRadius,
             Mathf.Sin(danceAngle) * currentDanceRadius,
             0f
         );
-        
-        targetPosition += new Vector3(pivotOffset.x, pivotOffset.y, 0f);
-    
-        Vector3 direction = (targetPosition - transform.position).normalized;
+
+        Vector3 toTarget = targetPosition - transform.position;
+        Vector3 direction = toTarget.normalized;
         transform.position += direction * moveSpeed * Time.deltaTime;
-        
-        // new direction
-        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-        transform.rotation = Quaternion.Lerp(transform.rotation, Quaternion.Euler(0, 0, angle), rotationSpeed * Time.deltaTime);
-        
-        // check sign collision
-        if (Vector3.Distance(transform.position, currentSign.position) < 0.5f)
+
+        Vector3 radial = targetPosition - center;
+        Vector3 tangent = new Vector3(-radial.y, radial.x, 0f);
+        if (tangent.sqrMagnitude > 0.0001f)
         {
-            HandleSignCollision();
+            float angle = Mathf.Atan2(tangent.y, tangent.x) * Mathf.Rad2Deg;
+            transform.rotation = Quaternion.Lerp(transform.rotation, Quaternion.Euler(0, 0, angle), rotationSpeed * Time.deltaTime);
         }
     }
 
@@ -212,101 +215,100 @@ public class Follower : MonoBehaviour
     {
         if (theStillOne == null)
         {
-            currentState = FollowerState.Idle;
+            if (rb != null) rb.linearVelocity = Vector2.zero;
+            EnterIdle();
             return;
         }
 
-        // calculate opposite directino from stillOne
         Vector3 fleeDirection = PhysicsHelper.GetFleeDirection(transform.position, theStillOne.position);
-        
+
         if (rb != null)
         {
-            PhysicsHelper.ApplyForce(rb, fleeDirection, fleeSpeed);
+            rb.linearVelocity = (Vector2)(fleeDirection * fleeSpeed);
         }
         else
         {
             transform.position += fleeDirection * fleeSpeed * Time.deltaTime;
         }
-        
-        if (PhysicsHelper.IsInRange(transform, theStillOne, detectionRange * 1.5f))
+
+        float movedDistance = Vector3.Distance(transform.position, theStillOne.position);
+        if (!stillOneInRange && movedDistance > fleeStartDistance + detectionRange)
         {
-            currentState = FollowerState.Idle;
-            stateTimer = 0f;
+            if (rb != null) rb.linearVelocity = Vector2.zero;
+            EnterIdle();
         }
     }
 
-    void CheckEnvironment()
+    void EnterIdle()
     {
-        
-        if (isInCooldown)
-        {
+        currentState = FollowerState.Idle;
+        stateTimer = 0f;
+        currentStateDuration = Random.Range(minIdleTime, maxIdleTime);
+        SetNewRandomPoint();
+        ExitDancing();
+    }
+
+    void EnterMoving()
+    {
+        currentState = FollowerState.Moving;
+        stateTimer = 0f;
+        currentStateDuration = Random.Range(minMoveTime, maxMoveTime);
+        SetNewRandomPoint();
+    }
+
+    void EnterDancing(Transform signTarget)
+    {
+        currentSign = signTarget;
+        currentDanceRadius = initialDanceRadius;
+        danceAngle = Random.Range(0f, Mathf.PI * 2f);
+        currentState = FollowerState.Dancing;
+        isDancing = true;
+    }
+
+    void ExitDancing()
+    {
+        isDancing = false;
+        currentSign = null;
+    }
+
+    void EnterFleeing()
+    {
+        if (theStillOne == null)
             return;
-        }
 
-        // check stillOne in sight
-        if (theStillOne != null && PhysicsHelper.IsInRange(transform, theStillOne, detectionRange))
+        ExitDancing();
+        currentState = FollowerState.Fleeing;
+        fleeStartDistance = Vector3.Distance(transform.position, theStillOne.position);
+    }
+
+    Transform SelectNearestSign()
+    {
+        float bestDistance = float.MaxValue;
+        Transform best = null;
+        foreach (Transform sign in nearbySigns)
         {
-            currentState = FollowerState.Fleeing;
-            return;
-        }
+            if (sign == null)
+                continue;
 
-        // check Sign in Sight
-        const string SIGN_TAG = "Sign";
-        Collider2D[] signs = PhysicsHelper.GetObjectsInRange(transform.position, detectionRange, SIGN_TAG);
-        
-        if (signs == null || signs.Length == 0)
-        {
-            return;
-        }
-
-        foreach (Collider2D signCollider in signs)
-        {
-            if (signCollider == null) continue;
-
-            // CHeck follower in sight if they are dancing
-            Follower[] nearbyFollowers = PhysicsHelper.GetComponentsInRange<Follower>(signCollider.transform.position, detectionRange);
-            bool hasDancingFollower = false;
-            
-            foreach (Follower otherFollower in nearbyFollowers)
+            float distance = Vector3.Distance(transform.position, sign.position);
+            if (distance < bestDistance)
             {
-                if (otherFollower != null && otherFollower.isDancing && otherFollower.currentSign == signCollider.transform)
-                {
-                    hasDancingFollower = true;
-                    break;
-                }
-            }
-
-            
-            if (hasDancingFollower)
-            {
-                currentSign = signCollider.transform;
-                currentDanceRadius = initialDanceRadius;
-                currentState = FollowerState.Dancing;
-                isDancing = true;
-                return;
-            }
-            // if the sisgn has no follower dancing around, start new cycle
-            else if (!isDancing)
-            {
-                currentSign = signCollider.transform;
-                currentDanceRadius = initialDanceRadius;
-                currentState = FollowerState.Dancing;
-                isDancing = true;
-                return;
+                bestDistance = distance;
+                best = sign;
             }
         }
+        return best;
     }
 
     void HandleSignCollision()
     {
         // new follower spawn
-        int spawnCount = Random.Range(minSpawnCount, maxSpawnCount);
+        int spawnCount = Random.Range(minSpawnCount, maxSpawnCount + 1);
         for (int i = 0; i < spawnCount; i++)
         {
             SpawnNewFollower();
         }
-        
-        //destroy
+
         if (creatureManager != null)
         {
             creatureManager.OnFollowerDestroyed(gameObject);
@@ -318,7 +320,14 @@ public class Follower : MonoBehaviour
     {
         Vector3 spawnPos = transform.position + Random.insideUnitSphere * 2f;
         spawnPos.z = 0f;
-        GameObject newFollower = Instantiate(gameObject, spawnPos, Quaternion.identity);
+        if (creatureManager != null)
+        {
+            creatureManager.SpawnFollowerAt(spawnPos);
+        }
+        else
+        {
+            Instantiate(gameObject, spawnPos, Quaternion.identity);
+        }
     }
 
     void SetNewRandomPoint()
@@ -341,44 +350,49 @@ public class Follower : MonoBehaviour
 
     void OnCollisionEnter2D(Collision2D collision)
     {
-        //StillOne collision
-        if (collision.gameObject.CompareTag("TheStillOne"))
+        if (currentState != FollowerState.Dancing || currentSign == null)
+            return;
+
+        Sign hitSign = collision.gameObject.GetComponentInParent<Sign>();
+        if (hitSign != null && hitSign.transform == currentSign)
+            HandleSignCollision();
+    }
+
+    void WrapScreenPosition()
+    {
+        transform.position = PhysicsHelper.WrapToScreenBounds(transform.position, mainCamera, screenBoundaryOffset);
+    }
+
+    public bool IsDancing()
+    {
+        return currentState == FollowerState.Dancing;
+    }
+
+    
+    public void OnDetectionTriggerEnter2D(Collider2D other)
+    {
+        // 碰撞体常在子物体上且为 Untagged,,用parent组件判断
+        Sign sign = other.GetComponentInParent<Sign>();
+        if (sign != null)
         {
-            if (creatureManager != null)
-            {
-                creatureManager.OnFollowerDestroyed(gameObject);
-            }
-            Destroy(gameObject);
+            nearbySigns.Add(sign.transform);
             return;
         }
 
-        // Collision with Followers
-        Follower otherFollower = collision.gameObject.GetComponent<Follower>();
-        if (otherFollower != null)
-        {
-            
-            Vector3 collisionDirection = PhysicsHelper.GetMoveDirection(transform.position, collision.transform.position);
-            if (rb != null)
-            {
-                PhysicsHelper.ApplyForce(rb, collisionDirection, collisionForce);
-            }
-        }
+        if (other.GetComponentInParent<TheStillOne>() != null)
+            stillOneInRange = true;
     }
 
-    void ClampPosition()
+    public void OnDetectionTriggerExit2D(Collider2D other)
     {
-        transform.position = PhysicsHelper.ClampToScreenBounds(transform.position, mainCamera, screenBoundaryOffset);
-    }
-
-    //check disappearing state
-    public void OnSignDisappearing()
-    {
-        if (currentState == FollowerState.Dancing)
+        Sign sign = other.GetComponentInParent<Sign>();
+        if (sign != null)
         {
-            currentState = FollowerState.Idle;
-            isDancing = false;
-            currentSign = null;
-            SetNewRandomPoint();
+            nearbySigns.Remove(sign.transform);
+            return;
         }
+
+        if (other.GetComponentInParent<TheStillOne>() != null)
+            stillOneInRange = false;
     }
 }

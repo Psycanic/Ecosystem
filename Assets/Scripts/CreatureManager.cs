@@ -16,7 +16,6 @@ public class CreatureManager : MonoBehaviour
     public int maxSignCount = 8;
     
     //spawnrange
-    public float spawnRadius = 2f;
     public float minSpawnDistance = 3f;
     
     private Camera mainCamera;
@@ -71,26 +70,10 @@ public class CreatureManager : MonoBehaviour
 
     void SpawnFollower()
     {
-        //null check
-        if (followerPrefab == null)
-        {
-            
-            return;
-        }
-
-       
-        if (activeFollowers.Count >= maxFollowerCount)
-        {
-            return;
-        }
-
-        
         Vector3 spawnPos = GetValidSpawnPosition();
-        
-        GameObject newFollower = Instantiate(followerPrefab, spawnPos, Quaternion.identity);
+        GameObject newFollower = SpawnFollowerAt(spawnPos);
         if (newFollower != null)
         {
-            activeFollowers.Add(newFollower);
             Debug.Log($"Spawned new follower. Total count: {activeFollowers.Count}");
         }
         else
@@ -102,8 +85,48 @@ public class CreatureManager : MonoBehaviour
     void SpawnSign()
     {
         Vector3 spawnPos = GetValidSpawnPosition();
+        SpawnSignAt(spawnPos);
+    }
+
+    public GameObject SpawnFollowerAt(Vector3 spawnPos)
+    {
+        if (followerPrefab == null)
+        {
+            return null;
+        }
+
+        if (activeFollowers.Count >= maxFollowerCount)
+        {
+            return null;
+        }
+
+        GameObject newFollower = Instantiate(followerPrefab, spawnPos, Quaternion.identity);
+        if (newFollower != null)
+        {
+            activeFollowers.Add(newFollower);
+        }
+        return newFollower;
+    }
+
+    public GameObject SpawnSignAt(Vector3 spawnPos)
+    {
+        if (signPrefab == null)
+        {
+            Debug.LogError("CreatureManager: signPrefab is null or missing (check Inspector assignment).");
+            return null;
+        }
+
+        if (activeSigns.Count >= maxSignCount)
+        {
+            return null;
+        }
+
         GameObject sign = Instantiate(signPrefab, spawnPos, Quaternion.identity);
-        activeSigns.Add(sign);
+        if (sign != null)
+        {
+            activeSigns.Add(sign);
+        }
+        return sign;
     }
 
     Vector3 GetValidSpawnPosition()
@@ -154,11 +177,7 @@ public class CreatureManager : MonoBehaviour
 
     void CalculateScreenBoundaries()
     {
-        Vector2 screenBounds = mainCamera.ScreenToWorldPoint(new Vector3(Screen.width, Screen.height, mainCamera.transform.position.z));
-        minX = -screenBounds.x + screenBoundaryOffset;
-        maxX = screenBounds.x - screenBoundaryOffset;
-        minY = -screenBounds.y + screenBoundaryOffset;
-        maxY = screenBounds.y - screenBoundaryOffset;
+        PhysicsHelper.GetScreenBounds(mainCamera, out minX, out maxX, out minY, out maxY, screenBoundaryOffset);
     }
 
     //access messages for other objects
@@ -171,17 +190,4 @@ public class CreatureManager : MonoBehaviour
     {
         activeSigns.Remove(sign);
     }
-
-
-    /*
-    public int GetActiveFollowerCount()
-    {
-        return activeFollowers.Count;
-    }
-
-    public int GetActiveSignCount()
-    {
-        return activeSigns.Count;
-    
-}*/
 }
